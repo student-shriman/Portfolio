@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { personalData } from '../data/portfolioData';
-import { Mail, Phone, MapPin, Copy, Check, Send, Linkedin, Github, MessageSquare } from 'lucide-react';
+import { Mail, Phone, MapPin, Copy, Check, Send, Linkedin, Github, MessageSquare, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function Contact() {
   const [copied, setCopied] = useState(false);
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
-  const [submitted, setSubmitted] = useState(false);
+  const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'success' | 'error'
+  const [errorMessage, setErrorMessage] = useState('');
 
   const copyEmail = () => {
     navigator.clipboard.writeText(personalData.email);
@@ -13,13 +14,41 @@ export default function Contact() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Create mailto link as fallback for static deployment
-    const subject = encodeURIComponent(`Portfolio Inquiry from ${formState.name}`);
-    const body = encodeURIComponent(`Name: ${formState.name}\nEmail: ${formState.email}\n\nMessage:\n${formState.message}`);
-    window.location.href = `mailto:${personalData.email}?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setStatus('loading');
+    setErrorMessage('');
+
+    try {
+      const response = await fetch(`https://formsubmit.co/ajax/${personalData.email}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formState.name,
+          email: formState.email,
+          message: formState.message,
+          _subject: `New Portfolio Message from ${formState.name}`,
+          _template: 'table',
+          _captcha: 'false',
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && (result.success === 'true' || result.success === true)) {
+        setStatus('success');
+        setFormState({ name: '', email: '', message: '' });
+      } else {
+        setStatus('error');
+        setErrorMessage(result.message || 'Unable to send message. Please send an email directly.');
+      }
+    } catch (err) {
+      setStatus('error');
+      setErrorMessage('Network connection error. Please send an email directly.');
+    }
   };
 
   return (
@@ -138,73 +167,106 @@ export default function Contact() {
             </div>
           </div>
 
-          {/* Right Column: Interactive Direct Message Form */}
+          {/* Right Column: Direct In-Browser Message Form (FormSubmit.co) */}
           <div className="lg:col-span-7">
             <div className="glass-card p-6 sm:p-8 rounded-2xl border border-slate-800/80">
               <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-cyan-400" />
-                <span>Send a Message</span>
+                <span>Send a Direct Message</span>
               </h3>
               <p className="text-sm text-slate-400 mb-6">
-                Fill in the details below to launch your email client with a pre-filled message directly to me.
+                Send a message directly to <strong className="text-cyan-400 font-medium">{personalData.email}</strong> right from this browser.
               </p>
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
-                    Your Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formState.name}
-                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                    placeholder="Jane Doe"
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-                  />
+              {status === 'success' ? (
+                <div className="p-6 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-center space-y-3 animate-fade-in">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                    <CheckCircle2 className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-lg font-bold text-white">Message Sent Successfully!</h4>
+                  <p className="text-sm text-slate-300 max-w-md mx-auto">
+                    Thank you for reaching out! Your message has been sent directly to Shriman's inbox. He will get back to you shortly.
+                  </p>
+                  <button
+                    onClick={() => setStatus('idle')}
+                    className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                  >
+                    Send Another Message
+                  </button>
                 </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                      Your Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formState.name}
+                      onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                      placeholder="Jane Doe"
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
-                    Your Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={formState.email}
-                    onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                    placeholder="jane@company.com"
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                      Your Email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={formState.email}
+                      onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                      placeholder="jane@company.com"
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
-                    Message / Opportunity Details
-                  </label>
-                  <textarea
-                    rows={4}
-                    required
-                    value={formState.message}
-                    onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                    placeholder="Hi Shriman, we would love to discuss an AI Engineering role..."
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-xs font-mono uppercase text-slate-400 mb-1.5">
+                      Message / Opportunity Details
+                    </label>
+                    <textarea
+                      rows={4}
+                      required
+                      value={formState.message}
+                      onChange={(e) => setFormState({ ...formState, message: e.target.value })}
+                      placeholder="Hi Shriman, I came across your portfolio and would like to discuss an opportunity..."
+                      className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-slate-200 placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-500 transition-colors"
+                    />
+                  </div>
 
-                <button
-                  type="submit"
-                  className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.01]"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Send Message via Email</span>
-                </button>
-              </form>
+                  {status === 'error' && (
+                    <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
 
-              {submitted && (
-                <div className="mt-4 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs text-center">
-                  Email client opened! If it didn't open automatically, please email directly to {personalData.email}.
-                </div>
+                  <button
+                    type="submit"
+                    disabled={status === 'loading'}
+                    className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-semibold bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-60 text-white shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.01]"
+                  >
+                    {status === 'loading' ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Sending message...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Send Message Directly</span>
+                      </>
+                    )}
+                  </button>
+
+                  <p className="text-[11px] text-center text-slate-500">
+                    Direct submission delivered to {personalData.email} via secure SSL.
+                  </p>
+                </form>
               )}
             </div>
           </div>
